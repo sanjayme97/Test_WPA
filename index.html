@@ -290,7 +290,7 @@
                     const downloadBtn = document.createElement('button');
                     downloadBtn.innerHTML = `<img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/download.svg" alt="Download" class="icon" onerror="this.style.display='none'"> Download`;
                     downloadBtn.className = 'mt-2 text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-4 focus:outline-none focus:ring-indigo-300 font-medium rounded-lg text-xs px-3 py-1.5 text-center inline-flex items-center transition ease-in-out duration-150 shadow-sm'; // Adjusted button style
-                    downloadBtn.onclick = () => downloadImage(imgData.original, `original-${imgData.id}.png`);
+                    downloadBtn.onclick = () => downloadImage(imgData.original, `original-${imgData.id}.jpg`);
                     itemDiv.appendChild(downloadBtn);
 
                     imageList.appendChild(itemDiv);
@@ -411,7 +411,7 @@
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
                 // originalDataUrl = canvas.toDataURL('image/jpeg');
                 // Inside captureAndProcessImage function:
-                originalDataUrl = canvas.toDataURL('image/png');
+                originalDataUrl = canvas.toDataURL('image/jpeg');
                 console.log("Image drawn to canvas.");
 
                 // 2. Simulate Processing (Dummy - replace with actual API logic if needed)
@@ -451,7 +451,7 @@
         }
 
         // Function to trigger download of a Data URL
-        function downloadImage(dataUrl, filename = 'capture.png') {
+        function downloadImage(dataUrl, filename = 'capture.jpg') {
             const link = document.createElement('a');
             link.href = dataUrl;
             link.download = filename;

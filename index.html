@@ -290,7 +290,7 @@
                     const downloadBtn = document.createElement('button');
                     downloadBtn.innerHTML = `<img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/download.svg" alt="Download" class="icon" onerror="this.style.display='none'"> Download`;
                     downloadBtn.className = 'mt-2 text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-4 focus:outline-none focus:ring-indigo-300 font-medium rounded-lg text-xs px-3 py-1.5 text-center inline-flex items-center transition ease-in-out duration-150 shadow-sm'; // Adjusted button style
-                    downloadBtn.onclick = () => downloadImage(imgData.original, `original-${imgData.id}.jpg`);
+                    downloadBtn.onclick = () => downloadImage(imgData.original, `original-${imgData.id}.png`);
                     itemDiv.appendChild(downloadBtn);
 
                     imageList.appendChild(itemDiv);
@@ -311,7 +311,21 @@
                 return;
              }
             if (!video || !startButton || !captureButton) return; // Other elements check
+            const constraints = {
+        audio: false,
+        video: {
+            facingMode: 'environment', // Keep preferring back camera
 
+            // --- THIS IS THE KEY PART ---
+            // Request a significantly higher resolution
+            width: { ideal: 1900 },  // TRY THIS (Full HD width)
+            height: { ideal: 1100 }, // TRY THIS (Full HD height)
+            // If 1920x1080 works, you could even try aiming for 4K on good phones:
+            // width: { ideal: 3840 },
+            // height: { ideal: 2160 },
+            // --- END OF KEY PART ---
+        }
+    };
             updateButtonState(startButton, 'loading', 'Starting...');
             updateButtonState(captureButton, 'disabled', 'Capture');
             clearError();
@@ -324,18 +338,15 @@
                 }
 
                 // Get new stream
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' }, // Prefer back camera
-                    audio: false
-                });
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
                 console.log("getUserMedia successful.");
                 video.srcObject = stream;
 
                 video.onloadedmetadata = () => {
                     console.log("Video metadata loaded.");
                     // Set canvas dimensions to match video - IMPORTANT!
-                    // canvas.width = video.videoWidth;
-                    // canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
                     console.log(`Canvas dimensions set: ${canvas.width}x${canvas.height}`);
 
                     updateButtonState(startButton, 'running', 'Restart Camera');
@@ -398,7 +409,9 @@
                      }
                  }
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                originalDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                // originalDataUrl = canvas.toDataURL('image/jpeg');
+                // Inside captureAndProcessImage function:
+                originalDataUrl = canvas.toDataURL('image/png');
                 console.log("Image drawn to canvas.");
 
                 // 2. Simulate Processing (Dummy - replace with actual API logic if needed)
@@ -438,7 +451,7 @@
         }
 
         // Function to trigger download of a Data URL
-        function downloadImage(dataUrl, filename = 'capture.jpg') {
+        function downloadImage(dataUrl, filename = 'capture.png') {
             const link = document.createElement('a');
             link.href = dataUrl;
             link.download = filename;

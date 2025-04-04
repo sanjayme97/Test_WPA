@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5"/>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png"> <title>Camera Capture App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <style>
+        /* Base font */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* bg-gray-100 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align items to the top */
+            min-height: 100vh;
+            padding: 1rem; /* Add some padding */
+        }
+        /* Main container for layout - ALWAYS VERTICAL NOW */
+        .main-container {
+            background-color: white;
+            padding: 1.5rem; /* p-6 */
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+            display: flex;
+            flex-direction: column; /* Stack vertically ALWAYS */
+            gap: 1.5rem; /* gap-6 */
+            width: 100%;
+            max-width: 1000px; /* Max width for the entire container */
+        }
+
+        /* Styling for camera and list sections */
+        .camera-section, .list-section {
+            text-align: center;
+        }
+
+        /* Styles specific to the list section when it's below */
+        .list-section {
+             max-height: 50vh; /* Adjust max height as needed */
+             overflow-y: auto;
+             border-top: 1px solid #e5e7eb; /* Optional: Add border top */
+             padding-top: 1.5rem; /* Optional: Add padding top */
+        }
+
+
+        /* Media elements styling */
+        video, canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem; /* rounded-lg */
+            margin-top: 1rem; /* mt-4 */
+            margin-bottom: 1rem; /* mb-4 */
+            border: 1px solid #e5e7eb; /* border-gray-200 */
+            display: block; /* Ensure it takes block space */
+            margin-left: auto;
+            margin-right: auto;
+        }
+        /* REMOVED canvas { display: none; } because it's inline now */
+
+        /* Image list item container */
+        .image-item {
+            margin-bottom: 0.75rem; /* mb-3 */
+            border-radius: 0.375rem; /* rounded-md */
+            border: 1px solid #e5e7eb; /* border-gray-200 */
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); /* shadow-sm */
+            overflow: hidden; /* Contain the image */
+            max-width: 250px; /* Optional: Limit width of thumbs */
+            margin-left: auto;
+            margin-right: auto;
+        }
+        /* Styling for images in the list */
+        #imageList img {
+            width: 100%;
+            display: block; /* Remove extra space below image */
+        }
+        /* Error message styling */
+        .error-message {
+            color: #ef4444; /* text-red-500 */
+            margin-top: 1rem; /* mt-4 */
+            font-weight: 500; /* font-medium */
+        }
+        /* Utility class to hide elements */
+        .hidden {
+            display: none;
+        }
+        /* Icon styling within buttons */
+        .icon {
+            width: 1.25rem; /* w-5 */
+            height: 1.25rem; /* h-5 */
+            margin-right: 0.5rem; /* mr-2 */
+            display: inline-block; /* Ensure proper alignment */
+            vertical-align: middle; /* Align icon with text */
+        }
+         /* Spin animation */
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        /* Button container */
+        .button-container {
+            margin-top: 1rem; /* mt-4 */
+            display: flex;
+            justify-content: center;
+            gap: 1rem; /* space-x-4 */
+            flex-wrap: wrap; /* Allow buttons to wrap */
+        }
+        /* Processing overlay - Optional but good UX */
+        .processing-indicator {
+            font-size: 0.875rem; /* text-sm */
+            color: #6b7280; /* text-gray-500 */
+            margin-top: 0.5rem; /* mt-2 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .processing-indicator .icon {
+             margin-right: 0.5rem; /* mr-2 */
+        }
+
+        /* REMOVED @media (min-width: 768px) block to keep layout vertical */
+
+    </style>
+</head>
+<body>
+    <div class="main-container">
+
+        <div class="camera-section">
+            <h1 class="text-xl font-semibold mb-2">Camera View</h1>
+            <video id="videoFeed" autoplay playsinline></video>
+            <canvas id="canvas" style="display: none;"></canvas>
+            <div id="errorMessage" class="error-message hidden"></div>
+
+            <div class="button-container">
+                 <button id="startButton" class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center transition ease-in-out duration-150 shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/video.svg" alt="" class="icon video-icon" onerror="this.style.display='none'">
+                    <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/refresh-cw.svg" alt="" class="icon refresh-icon hidden" onerror="this.style.display='none'">
+                    <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/loader-2.svg" alt="" class="icon loading-icon hidden animate-spin" onerror="this.style.display='none'">
+                    <span class="button-text">Start Camera</span>
+                </button>
+                <button id="captureButton" disabled class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center transition ease-in-out duration-150 shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/camera.svg" alt="" class="icon camera-icon" onerror="this.style.display='none'">
+                     <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/loader-2.svg" alt="" class="icon loading-icon hidden animate-spin" onerror="this.style.display='none'">
+                    <span class="button-text">Capture</span>
+                </button>
+            </div>
+            <div id="processingIndicator" class="processing-indicator hidden">
+                 <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/loader-2.svg" alt="Processing" class="icon animate-spin" onerror="this.style.display='none'">
+                Processing & Saving...
+            </div>
+        </div>
+
+        <div class="list-section">
+            <h2 class="text-xl font-semibold mb-4">Captured Images</h2>
+            <div id="imageList">
+                <p id="noImagesText" class="text-gray-500">No images captured yet.</p>
+                </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const API_ENDPOINT = '/api/process-image'; // *** Using Dummy Below ***
+        const LOCAL_STORAGE_KEY = 'capturedImagesData_v2'; // Use a versioned key
+
+        // --- Get DOM Elements ---
+        const video = document.getElementById('videoFeed');
+        const canvas = document.getElementById('canvas'); // Still need reference
+        const imageList = document.getElementById('imageList');
+        const noImagesText = document.getElementById('noImagesText');
+        const startButton = document.getElementById('startButton');
+        const captureButton = document.getElementById('captureButton');
+        const errorMessage = document.getElementById('errorMessage');
+        const processingIndicator = document.getElementById('processingIndicator');
+        const context = canvas.getContext('2d'); // Still need context
+
+        let stream = null; // Holds the MediaStream object
+
+        // --- Helper Functions ---
+
+        function displayError(message, isCritical = false) {
+            errorMessage.textContent = `Error: ${message}`;
+            errorMessage.classList.remove('hidden');
+            console.error(message);
+            if (isCritical && startButton) startButton.disabled = true; // Disable start if critical
+            if (captureButton) captureButton.disabled = true; // Always disable capture on error
+            processingIndicator.classList.add('hidden'); // Hide processing indicator on error
+        }
+
+        function clearError() {
+             errorMessage.classList.add('hidden');
+             errorMessage.textContent = '';
+        }
+
+         function updateButtonState(button, state, text) {
+            const textSpan = button.querySelector('.button-text');
+            const icons = {
+                video: button.querySelector('.video-icon'),
+                refresh: button.querySelector('.refresh-icon'),
+                camera: button.querySelector('.camera-icon'),
+                loading: button.querySelector('.loading-icon'),
+            };
+
+            // Hide all icons first
+            Object.values(icons).forEach(icon => icon?.classList.add('hidden'));
+
+            if (textSpan) textSpan.textContent = text;
+            button.disabled = (state === 'loading' || state === 'disabled');
+
+            switch(state) {
+                case 'initial': // Start button initial state
+                    icons.video?.classList.remove('hidden');
+                    break;
+                case 'running': // Start button running state
+                    icons.refresh?.classList.remove('hidden');
+                    break;
+                case 'loading': // Any button loading state
+                    icons.loading?.classList.remove('hidden');
+                    break;
+                 case 'captureReady': // Capture button ready state
+                    icons.camera?.classList.remove('hidden');
+                    break;
+                case 'disabled': // Any button disabled state (without loading)
+                     if (button === startButton) icons.video?.classList.remove('hidden');
+                     if (button === captureButton) icons.camera?.classList.remove('hidden');
+                    break;
+            }
+        }
+
+        // --- Local Storage Functions ---
+
+        function getStoredImages() {
+            try {
+                const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+                return storedData ? JSON.parse(storedData) : [];
+            } catch (error) {
+                console.error("Error reading from localStorage:", error);
+                displayError("Could not load previously saved images.", false);
+                return []; // Return empty array on error
+            }
+        }
+
+        function saveImageToLocalStorage(originalDataUrl, processedDataUrl) {
+            try {
+                const images = getStoredImages();
+                const newImageEntry = {
+                    id: Date.now(), // Simple unique ID
+                    timestamp: new Date().toISOString(),
+                    original: originalDataUrl,
+                    processed: processedDataUrl // Store the processed image data/URL
+                };
+                images.unshift(newImageEntry); // Add new image to the beginning
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(images));
+                console.log("Image data saved to localStorage.");
+                return true;
+            } catch (error) {
+                console.error("Error saving to localStorage:", error);
+                // Check for quota exceeded error
+                if (error.name === 'QuotaExceededError') {
+                     displayError("Storage limit reached. Could not save new image. Please clear some storage.", false);
+                } else {
+                    displayError("Could not save image data.", false);
+                }
+                return false;
+            }
+        }
+
+        // Function to render images from data array
+        function renderImageList(imagesData) {
+            imageList.innerHTML = ''; // Clear current list
+            if (imagesData.length === 0) {
+                noImagesText.classList.remove('hidden');
+            } else {
+                noImagesText.classList.add('hidden');
+                imagesData.forEach(imgData => {
+                    const imgElement = document.createElement('img');
+                    imgElement.src = imgData.original; // Display original
+                    imgElement.alt = `Captured Image ${new Date(imgData.timestamp).toLocaleTimeString()}`;
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'image-item';
+                    itemDiv.appendChild(imgElement);
+                     // Add Download Button
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.innerHTML = `<img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/download.svg" alt="Download" class="icon" onerror="this.style.display='none'"> Download`;
+                    downloadBtn.className = 'mt-2 text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-4 focus:outline-none focus:ring-indigo-300 font-medium rounded-lg text-xs px-3 py-1.5 text-center inline-flex items-center transition ease-in-out duration-150 shadow-sm'; // Adjusted button style
+                    downloadBtn.onclick = () => downloadImage(imgData.original, `original-${imgData.id}.jpg`);
+                    itemDiv.appendChild(downloadBtn);
+
+                    imageList.appendChild(itemDiv);
+                });
+            }
+        }
+
+        // --- Core Functions ---
+
+        async function startCamera() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                displayError('getUserMedia is not supported by your browser.', true);
+                return;
+            }
+             // Ensure canvas element exists, even if hidden
+             if (!canvas) {
+                displayError('Canvas element is missing from HTML. Image capture will fail.', true);
+                return;
+             }
+            if (!video || !startButton || !captureButton) return; // Other elements check
+
+            updateButtonState(startButton, 'loading', 'Starting...');
+            updateButtonState(captureButton, 'disabled', 'Capture');
+            clearError();
+
+            try {
+                // Stop previous stream cleanly
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    console.log("Previous stream stopped.");
+                }
+
+                // Get new stream
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }, // Prefer back camera
+                    audio: false
+                });
+                console.log("getUserMedia successful.");
+                video.srcObject = stream;
+
+                video.onloadedmetadata = () => {
+                    console.log("Video metadata loaded.");
+                    // Set canvas dimensions to match video - IMPORTANT!
+                    // canvas.width = video.videoWidth;
+                    // canvas.height = video.videoHeight;
+                    console.log(`Canvas dimensions set: ${canvas.width}x${canvas.height}`);
+
+                    updateButtonState(startButton, 'running', 'Restart Camera');
+                    updateButtonState(captureButton, 'captureReady', 'Capture');
+                    video.classList.remove('hidden');
+                };
+
+                video.onerror = (e) => {
+                    console.error("Video element error:", e);
+                    displayError("An error occurred with the video stream.", false);
+                    updateButtonState(startButton, 'initial', 'Start Camera');
+                    stream = null; // Clear stream on error
+                }
+
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                let userMessage = `Could not access camera: ${err.name}`;
+                 if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    userMessage = 'Camera access denied. Please allow camera access in your browser settings.';
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    userMessage = 'No suitable camera found on this device.';
+                } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                    userMessage = 'Camera might be in use by another application or encountered an error.';
+                } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+                     userMessage = `The requested camera settings (e.g., facingMode) are not supported. ${err.message}`;
+                }
+                 displayError(userMessage, false);
+                 stream = null;
+                 video.srcObject = null;
+                 updateButtonState(startButton, 'initial', 'Start Camera');
+            }
+        }
+
+        async function captureAndProcessImage() {
+            // Ensure canvas element and context are available
+             if (!canvas || !context) {
+                 displayError('Canvas element or context is not available. Cannot capture.', true);
+                 return;
+             }
+             if (!stream || video.readyState < video.HAVE_CURRENT_DATA || !captureButton) {
+                displayError('Camera not ready or capture button missing.', false);
+                return;
+            }
+
+            updateButtonState(captureButton, 'loading', 'Capturing...');
+            processingIndicator.classList.remove('hidden'); // Show indicator
+            clearError(); // Clear previous non-critical errors
+
+            let originalDataUrl = null;
+
+            try {
+                // 1. Capture Image to Canvas (Requires canvas dimensions to be set)
+                 if (canvas.width === 0 || canvas.height === 0) {
+                     // Fallback if dimensions weren't set onloadedmetadata (should not happen often)
+                     console.warn("Canvas dimensions were zero, setting now.");
+                     canvas.width = video.videoWidth;
+                     canvas.height = video.videoHeight;
+                     if (canvas.width === 0 || canvas.height === 0) {
+                        throw new Error("Video dimensions are zero, cannot capture.");
+                     }
+                 }
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                originalDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                console.log("Image drawn to canvas.");
+
+                // 2. Simulate Processing (Dummy - replace with actual API logic if needed)
+                // For now, just use the original as the "processed" one for testing storage
+                const processedDataUrl = originalDataUrl;
+                console.log("Processing simulation complete.");
+
+                // 3. Save to Local Storage
+                const saved = saveImageToLocalStorage(originalDataUrl, processedDataUrl);
+
+                if (!saved) {
+                    console.warn("Image captured but failed to save permanently to localStorage.");
+                    // Keep the visual item, but maybe add an indicator later?
+                } else {
+                    console.log("Capture and saving successful.");
+                    // 4. Re-render the list to include the new item with its download button
+                    const currentImages = getStoredImages();
+                    renderImageList(currentImages); // Update list immediately after saving
+
+                    // 5. Trigger downloads (as requested in previous iteration)
+                    // downloadImage(processedDataUrl, `processed-${Date.now()}.jpg`);
+                    // downloadImage(originalDataUrl, `original-${Date.now()}.jpg`);
+                }
+
+            } catch (error) {
+                console.error("Error during capture/processing/saving:", error);
+                 displayError(`Operation failed: ${error.message}`, false);
+            } finally {
+                 // 6. Reset UI State
+                 processingIndicator.classList.add('hidden');
+                 if (stream) {
+                     updateButtonState(captureButton, 'captureReady', 'Capture');
+                 } else {
+                      updateButtonState(captureButton, 'disabled', 'Capture');
+                 }
+            }
+        }
+
+        // Function to trigger download of a Data URL
+        function downloadImage(dataUrl, filename = 'capture.jpg') {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            console.log(`Download triggered for: ${filename}`);
+        }
+
+        // --- Initialization ---
+        function initializeApp() {
+            // 1. Register Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => console.log('Service Worker registered:', registration.scope))
+                    .catch(error => console.error('Service Worker registration failed:', error));
+            } else {
+                 console.warn("Service workers are not supported.");
+            }
+
+            // 2. Load existing images from localStorage
+            const storedImages = getStoredImages();
+            renderImageList(storedImages);
+
+            // 3. Set initial button states
+             updateButtonState(startButton, 'initial', 'Start Camera');
+             updateButtonState(captureButton, 'disabled', 'Capture');
+
+            // 4. Add event listeners
+            startButton.addEventListener('click', startCamera);
+            captureButton.addEventListener('click', captureAndProcessImage);
+        }
+
+        // Run initialization when the DOM is ready
+        window.addEventListener('DOMContentLoaded', initializeApp);
+
+    </script>
+</body>
+</html>

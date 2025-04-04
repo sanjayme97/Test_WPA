@@ -148,6 +148,10 @@
                      <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/loader-2.svg" alt="" class="icon loading-icon hidden animate-spin" onerror="this.style.display='none'">
                     <span class="button-text">Capture</span>
                 </button>
+                <button id="flipButton" disabled class="text-white bg-gray-500 hover:bg-gray-600 focus:ring-4 focus:outline-none focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center transition ease-in-out duration-150 shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/switch-camera.svg" alt="" class="icon" onerror="this.style.display='none'">
+                    <span class="button-text">Flip</span>
+                </button>
             </div>
             <div id="processingIndicator" class="processing-indicator hidden">
                  <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/loader-2.svg" alt="Processing" class="icon animate-spin" onerror="this.style.display='none'">
@@ -179,6 +183,8 @@
         const errorMessage = document.getElementById('errorMessage');
         const processingIndicator = document.getElementById('processingIndicator');
         const context = canvas.getContext('2d'); // Still need context
+        const flipButton = document.getElementById('flipButton'); // Add this later in HTML
+        let currentFacingMode = 'environment'; // Variable to track current camera
 
         let stream = null; // Holds the MediaStream object
 
@@ -314,7 +320,7 @@
             const constraints = {
         audio: false,
         video: {
-            facingMode: 'environment', // Keep preferring back camera
+            facingMode: currentFacingMode, // Keep preferring back camera
 
             // --- THIS IS THE KEY PART ---
             // Request a significantly higher resolution
@@ -348,6 +354,7 @@
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     console.log(`Canvas dimensions set: ${canvas.width}x${canvas.height}`);
+                    flipButton.disabled = false; // *** ENABLE Flip button when stream is ready ***
 
                     updateButtonState(startButton, 'running', 'Restart Camera');
                     updateButtonState(captureButton, 'captureReady', 'Capture');
@@ -358,6 +365,7 @@
                     console.error("Video element error:", e);
                     displayError("An error occurred with the video stream.", false);
                     updateButtonState(startButton, 'initial', 'Start Camera');
+                    flipButton.disabled = true; // Disable flip on error
                     stream = null; // Clear stream on error
                 }
 
@@ -374,12 +382,29 @@
                      userMessage = `The requested camera settings (e.g., facingMode) are not supported. ${err.message}`;
                 }
                  displayError(userMessage, false);
+                 flipButton.disabled = true; // Disable flip on error
                  stream = null;
                  video.srcObject = null;
                  updateButtonState(startButton, 'initial', 'Start Camera');
             }
         }
+        function setupFlipButton() {
+    if (flipButton) {
+        flipButton.addEventListener('click', () => {
+            if (stream) { // Only flip if a stream is active
+                // Toggle facing mode
+                currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+                console.log(`Flipping camera to: ${currentFacingMode}`);
 
+                // Stop current stream and restart with new mode by calling startCamera again
+                // startCamera already handles stopping the old stream
+                startCamera();
+            }
+        });
+    } else {
+        console.warn("Flip button element not found.");
+    }
+}
         async function captureAndProcessImage() {
             // Ensure canvas element and context are available
              if (!canvas || !context) {
@@ -451,7 +476,7 @@
         }
 
         // Function to trigger download of a Data URL
-        function downloadImage(dataUrl, filename = 'capture.jpg') {
+        function downloadImage(dataUrl, filename = 'capture.png') {
             const link = document.createElement('a');
             link.href = dataUrl;
             link.download = filename;
@@ -475,6 +500,7 @@
             // 2. Load existing images from localStorage
             const storedImages = getStoredImages();
             renderImageList(storedImages);
+            setupFlipButton(); // Call the new setup function
 
             // 3. Set initial button states
              updateButtonState(startButton, 'initial', 'Start Camera');
